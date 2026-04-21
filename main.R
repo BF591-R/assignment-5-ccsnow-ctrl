@@ -32,7 +32,8 @@ make_se <- function(counts_csv, metafile_csv, selected_times) {
   metafile <- metafile %>% 
     filter(timepoint %in% selected_times)
   
-  metafile$timepoint <- factor(metafile$timepoint, levels = selected_times)
+  metafile$timepoint <- factor(metafile$timepoint)
+  metafile$timepoint <- relevel(metafile$timepoint, ref = "vP0")
   
   counts <- counts %>% 
     column_to_rownames("gene") %>% 
@@ -220,17 +221,21 @@ plot_volcano <- function(labeled_results) {
 #' @examples rnk_list <- make_ranked_log2fc(labeled_results, 'data/id2gene.txt')
 
 make_ranked_log2fc <- function(labeled_results, id2gene_path) {
-  id2gene <- read_tsv(id2gene_path, 
-                        col_names = c("genes", "symbol"))
+  id2gene <- read_tsv(id2gene_path, col_names = c("genes", "symbol"))
   
-  labeled_results <- labeled_results %>%
-    left_join(id2gene, by = "genes")  %>%
-    distinct(symbol, .keep_all = TRUE) %>%
-    filter(!is.na(symbol))
-  v <- setNames(labeled_results$log2FoldChange, labeled_results$symbol)
-  v <- sort(v, decreasing = TRUE)
-  return(v)
+  ranked_tibble <- labeled_results %>%
+    left_join(id2gene, by = "genes") %>%
+    arrange(desc(log2FoldChange)) %>%
+    drop_na(log2FoldChange, symbol) %>%
+    # Ensure we don't have duplicate symbols
+    distinct(symbol, .keep_all = TRUE) 
   
+  # Create the named vector: values = log2FC, names = symbol
+  rnk_vec <- ranked_tibble$log2FoldChange
+  names(rnk_vec) <- ranked_tibble$symbol
+  
+  return(rnk_vec)
+ 
   
 }
 
